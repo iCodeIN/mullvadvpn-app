@@ -253,12 +253,7 @@ class MullvadVpnService : TalpidVpnService() {
         handlePendingAction(settings)
 
         if (state == State.Running) {
-            instance = ServiceInstance(
-                messenger,
-                daemon,
-                connectionProxy,
-                customDns
-            )
+            instance = ServiceInstance(messenger, daemon, customDns)
         }
     }
 
