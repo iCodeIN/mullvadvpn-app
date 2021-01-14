@@ -24,7 +24,7 @@ class ServiceHandler(looper: Looper) : Handler(looper) {
         val request = Request.fromMessage(message)
 
         when (request) {
-            is Request.RegisterListener -> listeners.add(request.listener)
+            is Request.RegisterListener -> registerListener(request.listener)
         }
     }
 
@@ -32,6 +32,14 @@ class ServiceHandler(looper: Looper) : Handler(looper) {
         settingsListener.onDestroy()
 
         daemon = null
+    }
+
+    private fun registerListener(listener: Messenger) {
+        listeners.add(listener)
+
+        listener.apply {
+            send(Event.SettingsUpdate(settingsListener.settings).message)
+        }
     }
 
     private fun sendEvent(event: Event) {
