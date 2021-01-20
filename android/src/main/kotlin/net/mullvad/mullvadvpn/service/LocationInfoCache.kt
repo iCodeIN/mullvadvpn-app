@@ -93,6 +93,7 @@ class LocationInfoCache(
         connectionProxy.onStateChange.unsubscribe(this)
         fetchRequestChannel.close()
 
+        onNewLocation = null
         daemon = null
     }
 
