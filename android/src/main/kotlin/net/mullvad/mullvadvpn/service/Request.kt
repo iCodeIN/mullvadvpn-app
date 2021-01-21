@@ -392,6 +392,8 @@ sealed class Request {
         fun fromMessage(message: Message): Request {
             val type = Type.values()[message.what]
 
+            message.data.classLoader = Request::class.java.classLoader
+
             return type.build(message)
         }
     }

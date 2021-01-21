@@ -240,8 +240,11 @@ sealed class Event {
     companion object {
         fun fromMessage(message: Message): Event {
             val type = Type.values()[message.what]
+            val data = message.data
 
-            return type.build(message.data)
+            data.classLoader = Event::class.java.classLoader
+
+            return type.build(data)
         }
     }
 }
