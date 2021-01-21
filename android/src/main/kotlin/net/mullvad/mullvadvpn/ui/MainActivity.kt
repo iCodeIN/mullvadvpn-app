@@ -9,6 +9,7 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.os.Messenger
 import android.view.WindowManager
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
@@ -30,7 +31,7 @@ class MainActivity : FragmentActivity() {
     val serviceNotifier = EventNotifier<ServiceConnection?>(null)
 
     private var isUiVisible = false
-    private var service: MullvadVpnService.LocalBinder? = null
+    private var service: Messenger? = null
     private var shouldConnect = false
     private var visibleSecureScreens = HashSet<Fragment>()
 
@@ -55,30 +56,21 @@ class MainActivity : FragmentActivity() {
     private val serviceConnectionManager = object : android.content.ServiceConnection {
         override fun onServiceConnected(className: ComponentName, binder: IBinder) {
             android.util.Log.d("mullvad", "UI successfully connected to the service")
-            val localBinder = binder as MullvadVpnService.LocalBinder
+            val messenger = Messenger(binder)
+            val newConnection = ServiceConnection(messenger)
 
-            service = localBinder
+            service = messenger
+            serviceConnection = newConnection
 
-            localBinder.isUiVisible = isUiVisible
-
-            localBinder.serviceNotifier.subscribe(this@MainActivity) { service ->
-                android.util.Log.d("mullvad", "UI connection to the service changed: $service")
-
-                serviceConnection = service?.let { safeService ->
-                    ServiceConnection(safeService)
-                }
-
-                if (shouldConnect) {
-                    tryToConnect()
-                }
+            if (shouldConnect) {
+                tryToConnect()
             }
         }
 
         override fun onServiceDisconnected(className: ComponentName) {
             android.util.Log.d("mullvad", "UI lost the connection to the service")
-            service?.serviceNotifier?.unsubscribe(this@MainActivity)
-            service = null
             serviceConnection = null
+            service = null
             serviceNotifier.notify(null)
         }
     }
@@ -141,7 +133,6 @@ class MainActivity : FragmentActivity() {
     override fun onStop() {
         android.util.Log.d("mullvad", "Stoping main activity")
         isUiVisible = false
-        service?.isUiVisible = false
         service = null
         unbindService(serviceConnectionManager)
 
