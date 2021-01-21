@@ -13,6 +13,7 @@ import android.view.WindowManager
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentManager
+import kotlin.properties.Delegates.observable
 import net.mullvad.mullvadvpn.BuildConfig
 import net.mullvad.mullvadvpn.R
 import net.mullvad.mullvadvpn.dataproxy.MullvadProblemReport
@@ -30,7 +31,6 @@ class MainActivity : FragmentActivity() {
 
     private var isUiVisible = false
     private var service: MullvadVpnService.LocalBinder? = null
-    private var serviceConnection: ServiceConnection? = null
     private var shouldConnect = false
     private var visibleSecureScreens = HashSet<Fragment>()
 
@@ -38,6 +38,18 @@ class MainActivity : FragmentActivity() {
         val uiModeManager = getSystemService(UI_MODE_SERVICE) as UiModeManager
 
         uiModeManager.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
+    }
+
+    private var serviceConnection by observable<ServiceConnection?>(
+        null
+    ) { _, oldConnection, newConnection ->
+        oldConnection?.onDestroy()
+
+        newConnection?.dispatcher?.registerHandler(
+            Event.Type.ListenerReady
+        ) { _: Event.ListenerReady ->
+            serviceNotifier.notify(newConnection)
+        }
     }
 
     private val serviceConnectionManager = object : android.content.ServiceConnection {
@@ -51,22 +63,9 @@ class MainActivity : FragmentActivity() {
 
             localBinder.serviceNotifier.subscribe(this@MainActivity) { service ->
                 android.util.Log.d("mullvad", "UI connection to the service changed: $service")
-                serviceConnection?.onDestroy()
 
-                val newConnection = service?.let { safeService ->
+                serviceConnection = service?.let { safeService ->
                     ServiceConnection(safeService)
-                }
-
-                serviceConnection = newConnection
-
-                if (newConnection != null) {
-                    newConnection.dispatcher.registerHandler(
-                        Event.Type.ListenerReady
-                    ) { _: Event.ListenerReady ->
-                        serviceNotifier.notify(newConnection)
-                    }
-                } else {
-                    serviceNotifier.notify(null)
                 }
 
                 if (shouldConnect) {
@@ -78,7 +77,6 @@ class MainActivity : FragmentActivity() {
         override fun onServiceDisconnected(className: ComponentName) {
             android.util.Log.d("mullvad", "UI lost the connection to the service")
             service?.serviceNotifier?.unsubscribe(this@MainActivity)
-            serviceConnection?.onDestroy()
             service = null
             serviceConnection = null
             serviceNotifier.notify(null)
